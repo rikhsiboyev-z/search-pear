@@ -3,6 +3,8 @@ package org.example;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -14,33 +16,38 @@ public class SearchPear {
         String fileName = "src/main/resources/Толстой Лев. Война и мир. Книга.txt";
 
         ExecutorService executor = Executors.newFixedThreadPool(10);
-        Future<Integer> future = executor.submit(() -> countWordInFile(fileName, targetWord));
+        List<Future<List<Integer>>> futures = new ArrayList<>();
 
-        int count = future.get();
-        executor.shutdown();
-
-        System.out.println("Word '" + targetWord + "' found " + count + " times in the file.");
-    }
-
-    private static int countWordInFile(String fileName, String word) throws IOException {
-        int count = 0;
         try (BufferedReader reader = new BufferedReader(new FileReader(fileName))) {
             String line;
+            int lineIndex = 0;
             while ((line = reader.readLine()) != null) {
-                count += countWordInLine(line, word);
+                String finalLine = line;
+                int finalLineIndex = lineIndex;
+                futures.add(executor.submit(() -> findWordInLine(finalLine, targetWord, finalLineIndex)));
+                lineIndex++;
             }
         }
-        return count;
+
+        List<Integer> indices = new ArrayList<>();
+        for (Future<List<Integer>> future : futures) {
+            indices.addAll(future.get());
+        }
+
+        executor.shutdown();
+
+        System.out.println("Слово '" + targetWord + "' найдено " + indices.size() + " раз.");
+        System.out.println("Индексы вхождений: " + indices);
     }
 
-    private static int countWordInLine(String line, String word) {
-        int count = 0;
+    private static List<Integer> findWordInLine(String line, String word, int lineIndex) {
+        List<Integer> indices = new ArrayList<>();
         int index = 0;
         while ((index = line.indexOf(word, index)) != -1) {
-            count++;
+            indices.add(lineIndex * 1000 + index);
             index += word.length();
         }
-        return count;
+        return indices;
     }
 
 }
